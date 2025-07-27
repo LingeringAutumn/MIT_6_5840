@@ -1,4 +1,4 @@
-1. 概述
+# 1. 概述
    https://github.com/LingeringAutumn/MIT_6_5840
    [图片]
 1. 根据我对代码和这篇论文pdos.csail.mit.edu的理解，这个实验做的是一个分布式的MapReduce系统，简单来说，就是让很多台机器对一个大任务进行拆分，由一个master和多个worker共同协作完成这个任务，每个worker分别进行计算，然后去重（根据论文的说法，去重是在每个worker里进行完毕之后再进行数据汇总，这样能大大减少传输数据的过程中对网络的消耗，提高性能），最后进行统计。
@@ -9,8 +9,8 @@
 - RPC （定义数据结构，用于通信）
   其中，Coordinator 负责分配任务、记录状态、处理 worker 上报的任务完成信息，以及检测任务超时重试。
   Worker 通过 RPC 向 Coordinator 请求任务，执行 Map 或 Reduce 函数，并上报结果。
-2. 实际工作
-1. Coordinator
+# 2. 实际工作
+## 1. Coordinator
 1. 数据结构设计
    type Task struct {
    TaskId    int
@@ -61,9 +61,9 @@ taskLock    sync.Mutex   // 用于保护共享状态
 
 值得一提的是，c.mapTasks[i].StartTime = time.Now()这一行折磨了我很久，一开始我这里没写数组，一直报错；后面好不容易定位到这个地方修改完之后，还是报错，又因为修改过了所以一直没检查这里，最后才发现是把map模块的代码复制到这下面的时候，忘记把map改成reduce了...
 3.任务超时重置（这个是用来通过最后的crash test的）
-func (c *Coordinator) MonitorTaskTimeouts() {
-for {
-time.Sleep(500 * time.Millisecond) // 每 0.5 秒扫描一次
+```func (c *Coordinator) MonitorTaskTimeouts() {
+    for {
+       time.Sleep(500 * time.Millisecond) // 每 0.5 秒扫描一次
 
        c.taskLock.Lock()
        tasks := []*[]Task{&c.mapTasks, &c.reduceTasks}
@@ -82,10 +82,12 @@ time.Sleep(500 * time.Millisecond) // 每 0.5 秒扫描一次
        c.taskLock.Unlock()
     }
 }
-2. Worker
+```
+
+## 2. Worker
    Worker 主体是一个循环，持续向 Coordinator 请求任务，根据任务类型执行不同处理流程。
    核心函数如下。
-   // main/mrworker.go calls this function.
+   ```// main/mrworker.go calls this function.
    func Worker(mapf func(string, string) []KeyValue,
    reducef func(string, []string) string) {
 
@@ -208,9 +210,10 @@ time.Sleep(500 * time.Millisecond) // 每 0.5 秒扫描一次
        }
    }
    }
+   ```
 3. RPC
    定义了一些结构体。
-   type RequestTaskArgs struct {
+   ```type RequestTaskArgs struct {
    WorkerId int
    }
    type RequestTaskReply struct {
@@ -226,9 +229,9 @@ time.Sleep(500 * time.Millisecond) // 每 0.5 秒扫描一次
    }
    type ReportTaskReply struct {
    Success bool
-   }
+   }```
 
-3. 执行流程图
+# 3. 执行流程图
    我语言描述，然后让ai帮我画了一下
 1. 整体结构
    +------------------+
@@ -270,7 +273,7 @@ time.Sleep(500 * time.Millisecond) // 每 0.5 秒扫描一次
                     执行 Reducef
                         |
                     写入 mr-out-Y
-4. 踩坑
+# 4. 踩坑
 1. 最初没有设置任务超时机制，导致 crash 测试失败。
 1. 最开始我的结构体里面是没有时间的，然后crash一直不过，一开始以为是有什么细节的bug；后面看了一下crash的测试的指令，再去看了一下论文，然后又问了ai，再仔细想了一下，发现不对——按最初的方案，不加一个时间，那么，如果某个 Worker 卡住了任务，Coordinator 永远不会重试。
 2. 后面是这样解决的，然后就全过了
